@@ -5,8 +5,7 @@ GalaxyMorph is a deep learning project focused on classifying galaxies using the
 ---
 # 🎬 Demo Video
 
-[![Watch the demo]
-https://github.com/user-attachments/assets/c3bda364-cd46-473d-aee3-dcad293381ec
+[Watch the demo](https://github.com/user-attachments/assets/7d784b46-6df4-4ded-944c-e91a5256c75f)
 
 ---
 
