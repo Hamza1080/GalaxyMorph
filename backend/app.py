@@ -20,14 +20,16 @@ import getpass
 import os
 import sys
 
+from dotenv import load_dotenv
+load_dotenv()
 
-os.environ["GOOGLE_GENERATIVE_AI_API_KEY"] = 
+os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY", "")
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 # from langchain.document_loaders.csv_loader import CSVLoader
-from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 # from langchain.vectorstores import FAISS
-from langchain.chains import RetrievalQA
+from langchain.chains.retrieval_qa.base import RetrievalQA
 from langchain.prompts import PromptTemplate
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -101,14 +103,14 @@ def predict_single_image_class(model_path, image_path, label_encoder, target_siz
 
 def chatbot(query):
     llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
+    model="gemini-2.5-flash",
     temperature=0,
     max_tokens=None,
     timeout=None,
     max_retries=2,
     )
 
-    embeddings = FastEmbedEmbeddings()
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
     vector_db_path="faiss_index"
 
     vectordb=FAISS.load_local(vector_db_path,embeddings, allow_dangerous_deserialization=True)
@@ -167,16 +169,33 @@ def index():
 # Add new API routes for the Next.js frontend
 @app.route('/api/classify', methods=['POST'])
 def api_classify():
-    if 'image' not in request.files:
+    filepath = None
+
+    # Handle URL-based sample images
+    if request.is_json and request.json.get('image_url'):
+        import requests as req_lib
+        url = request.json['image_url']
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'sample.jpg')
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+            r = req_lib.get(url, headers=headers, timeout=15, allow_redirects=True)
+            r.raise_for_status()
+            with open(filepath, 'wb') as f:
+                f.write(r.content)
+        except Exception as e:
+            return jsonify({'error': f'Failed to download image: {str(e)}'}), 500
+
+    # Handle uploaded file
+    elif 'image' in request.files:
+        uploaded_file = request.files['image']
+        if uploaded_file.filename == '':
+            return jsonify({'error': 'No image selected'}), 400
+        filename = secure_filename(uploaded_file.filename)
+        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        uploaded_file.save(filepath)
+
+    else:
         return jsonify({'error': 'No image provided'}), 400
-    
-    uploaded_file = request.files['image']
-    if uploaded_file.filename == '':
-        return jsonify({'error': 'No image selected'}), 400
-    
-    filename = secure_filename(uploaded_file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    uploaded_file.save(filepath)
     
     preprocessedpath = preprocess_single_image(filepath)
     if not preprocessedpath:
@@ -186,7 +205,11 @@ def api_classify():
     le = LabelEncoder()
     le.fit(df['class'])
     model_path = "separable_cnn_improved_75acc.keras"
-    result = predict_single_image_class(model_path, preprocessedpath, le)
+    try:
+        result = predict_single_image_class(model_path, preprocessedpath, le)
+    except Exception as e:
+        print(f"Classification error: {e}")
+        return jsonify({'error': str(e)}), 500
     
     if not result:
         return jsonify({'error': 'Classification failed'}), 500
@@ -207,7 +230,10 @@ def api_chat():
         response = chatbot(user_query)
         return jsonify({'response': response})
     except Exception as e:
-        print(f"Error in chatbot: {e}")
+        err = str(e)
+        print(f"Error in chatbot: {err}")
+        if '429' in err or 'quota' in err.lower() or 'ResourceExhausted' in err:
+            return jsonify({'error': 'QUOTA_EXCEEDED'}), 429
         return jsonify({'error': 'Failed to get response'}), 500
 
 if __name__ == '__main__':

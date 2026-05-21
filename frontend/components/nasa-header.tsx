@@ -6,7 +6,7 @@ const NasaHeader = () => {
       <div className="inline-flex items-center justify-center space-x-2 bg-slate-900/60 backdrop-blur-sm px-6 py-3 rounded-full border border-blue-500/30">
         <Sparkles className="h-5 w-5 text-blue-400" />
         <h1 className="text-3xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-400">
-          DEEP SPACE NETWORK
+          GALAXY MORPH
         </h1>
         <Sparkles className="h-5 w-5 text-blue-400" />
       </div>

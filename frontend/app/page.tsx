@@ -43,7 +43,23 @@ export default function Home() {
   const [chatHistory, setChatHistory] = useState<ChatHistory[]>([])
 
   // Flask API URL - update this to your Flask server address
-  const FLASK_API_URL = "http://localhost:5000"
+  const FLASK_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+  const SAMPLE_GALAXIES = [
+    { label: "Elliptical Galaxy - Peculiar", url: "https://scx2.b-cdn.net/gfx/news/hires/2024/hubble-examines-ellipt.jpg" },
+    { label: "Barred Spiral Galaxy", url: "https://cdn.eso.org/images/wallpaper5/potw1037a.jpg" },
+  ]
+
+  const handleSampleClick = (url: string, label: string) => {
+    setError(null)
+    setClassificationResult(null)
+    setSelectedFile(null)
+    setImagePreview(url)
+    // Store URL as a special marker for backend to fetch
+    const syntheticFile = new File([], `${label}.jpg`)
+    ;(syntheticFile as any).__remoteUrl = url
+    setSelectedFile(syntheticFile)
+  }
 
   // Load history from localStorage on component mount
   useEffect(() => {
@@ -93,15 +109,25 @@ export default function Home() {
     setError(null)
 
     try {
-      // Create form data to send the file
-      const formData = new FormData()
-      formData.append("image", selectedFile)
+      let response
 
-      // Send to Flask backend
-      const response = await fetch(`${FLASK_API_URL}/api/classify`, {
-        method: "POST",
-        body: formData,
-      })
+      const remoteUrl = (selectedFile as any).__remoteUrl
+      if (remoteUrl) {
+        // Sample image — send URL to backend
+        response = await fetch(`${FLASK_API_URL}/api/classify`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image_url: remoteUrl }),
+        })
+      } else {
+        // Uploaded file
+        const formData = new FormData()
+        formData.append("image", selectedFile)
+        response = await fetch(`${FLASK_API_URL}/api/classify`, {
+          method: "POST",
+          body: formData,
+        })
+      }
 
       if (!response.ok) {
         throw new Error(`Server responded with status: ${response.status}`)
@@ -156,11 +182,14 @@ export default function Home() {
         body: JSON.stringify({ query }),
       })
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 429) {
         throw new Error(`Server responded with status: ${response.status}`)
       }
 
       const data = await response.json()
+      if (data.error === 'QUOTA_EXCEEDED' || response.status === 429) {
+        throw new Error('⚠️ Free tier quota exceeded. Please try again tomorrow or upgrade your Gemini API plan.')
+      }
       if (data.error) {
         throw new Error(data.error)
       }
@@ -255,6 +284,29 @@ export default function Home() {
                   </CardHeader>
                   <CardContent>
                     <form onSubmit={handleClassify} className="space-y-4">
+                      {/* Sample galaxy thumbnails */}
+                      <div>
+                        <p className="text-center text-sm text-slate-400 mb-2">Try a sample galaxy:</p>
+                        <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto">
+                          {SAMPLE_GALAXIES.map((g) => (
+                            <button
+                              key={g.label}
+                              type="button"
+                              onClick={() => handleSampleClick(g.url, g.label)}
+                              className="flex flex-col items-center group"
+                            >
+                              <img
+                                src={g.url}
+                                alt={g.label}
+                                className="w-full h-16 object-cover rounded-lg border border-slate-700 group-hover:border-blue-400 transition-all"
+                              />
+                              <span className="text-xs text-slate-400 mt-1 group-hover:text-blue-300">{g.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="text-center text-slate-500 text-xs">— or upload your own —</div>
                       <div className="grid w-full max-w-sm items-center gap-1.5 mx-auto">
                         <label htmlFor="image-upload" className="text-center mb-2">
                           Upload Galaxy Image
