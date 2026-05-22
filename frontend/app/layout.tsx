@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'Galaxy Morphology Classification using Deep Learning',
   generator: 'GalaxyMorph',
   icons: {
-    icon: '/favicon.png',
+    icon: '/favicon.svg',
   },
 }
 export default function RootLayout({
