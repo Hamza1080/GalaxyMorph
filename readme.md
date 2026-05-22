@@ -1,5 +1,7 @@
 # 🌌 GalaxyMorph: Galaxy Classification using CNNs
 
+LIVE PREVIEW :  https://galaxy-morph.vercel.app/
+
 GalaxyMorph is a deep learning project focused on classifying galaxies using the **Galaxy Zoo 2** dataset. It combines image preprocessing, augmentation, and a **Separable Convolutional Neural Network (Separable-CNN)** to perform galaxy morphological classification. A Flask dashboard is planned for visualizing classification results.
 
 ---
